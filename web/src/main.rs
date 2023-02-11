@@ -16,6 +16,7 @@ mod server;
 mod system_info;
 mod vo;
 mod http_handler;
+mod term;
 
 use self::server::MyWebSocket;
 

@@ -35,5 +35,9 @@ serde_yaml = "0.9.4"
 
 anyhow = "1.0"
 
+tokio-pty-process = "0.4"
+libc = "0.2.139"
+futures = "0.1.29"
+
 [target.'cfg(not(windows))'.dependencies]
 systemstat = "0.2.1"

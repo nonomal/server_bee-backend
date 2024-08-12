@@ -8,7 +8,12 @@ pub struct Args {
     /// Log directory, defaults to the current directory where the program is located.
     /// 日志目录, 默认为程序所在当前目录
     #[clap(short, long)]
-    pub log_path: Option<String>,
+    pub log_dir: Option<String>,
+
+    /// Data directory, defaults to the current directory where the program is located.
+    /// 数据目录, 默认为程序所在当前目录
+    #[clap(short, long)]
+    pub data_dir: Option<String>,
 
     /// port, default 9527.
     /// 端口号, 默认 9527
@@ -20,20 +25,27 @@ pub struct Args {
     #[clap(short, long)]
     pub app_token: Option<String>,
 
-    /// Token used to communicate with the server
-    /// 用于和服务器通信的 Token
+    /// Token used to communicate with the recorder service
+    /// 用于和 recorder 服务通信的 Token
+    /// Get from the ServerHub
+    /// 从 ServerHub 获取
     #[clap(short, long)]
     pub server_token: Option<String>,
 
-    /// ServerHub address, ip or domain.
-    /// 服务器地址, ip 或 domain
-    #[clap(short = 'h', long = "host")]
-    pub server_host: Option<String>,
+    /// Recorder service url, for example: https://recorder.serverhub.app
+    /// Recorder 服务 url, 例如: https://recorder.serverhub.app
+    #[clap(short = 'u', long = "url")]
+    pub server_url: Option<String>,
 
-    /// Disable SSL
-    /// 禁用 SSL
-    #[clap(long)]
-    pub disable_ssl: bool,
+    /// enable record, default false.
+    /// 启用 recorder, 默认 false
+    #[clap(short = 'r', long = "enable-record", default_value = "false")]
+    pub enable_record: bool,
+
+    /// record interval, unit second
+    /// 上报间隔，单位秒
+    #[clap(short = 'i', long = "record-interval", long)]
+    pub record_interval: Option<u64>,
 
     /// Print help information.
     /// 打印帮助信息

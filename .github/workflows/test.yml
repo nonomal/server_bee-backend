@@ -2,7 +2,7 @@ name: Test CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths-ignore:
       - '**/*.md'
       - LICENSE
@@ -11,8 +11,10 @@ on:
       - .github/**
       - view/**
       - snapshots/**
+      - docker/**
+      - packages/**
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
   workflow_dispatch:
 
@@ -32,6 +34,6 @@ jobs:
           version: 8
       - name: Install dependencies and build
         run: |
-          pnpm -C view install
-          pnpm -C view build
+          pnpm -C apps/view install
+          pnpm -C apps/view build
       - run: sudo ~/.cargo/bin/cargo test

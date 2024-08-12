@@ -1,7 +1,7 @@
 use crate::cli::Args;
 use crate::config::app::AppConfig;
 use crate::config::constant::{
-    APP_CONFIG, DEFAULT_PORT, LAST_LOGIN, LOG_PATH, SERVER_CONFIG, WEB_SERVER_CONFIG,
+    APP_CONFIG, DEFAULT_PORT, LAST_LOGIN, LOG_DIR, SERVER_CONFIG, WEB_SERVER_CONFIG,
 };
 use crate::config::server::ServerConfig;
 use crate::config::web_server::WebServerConfig;
@@ -17,13 +17,12 @@ use log4rs::append::rolling_file::RollingFileAppender;
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use std::env;
-use std::fs::File;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
 pub struct Config {
     db: DbWrapper,
-    log_path: PathBuf,
+    log_dir: PathBuf,
     web_server: WebServerConfig,
     server: ServerConfig,
     app: AppConfig,
@@ -31,7 +30,9 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(db: DbWrapper, args: Args) -> Self {
+    pub fn new(args: Args) -> Self {
+        let db = DbWrapper::new(args.data_dir.map(|d| PathBuf::from(d)));
+
         // merge web server config
         let mut web_server = match db.get(WEB_SERVER_CONFIG) {
             Ok(Some(v)) => v,
@@ -51,9 +52,10 @@ impl Config {
 
         server
             .merge(ServerConfig::new(
+                args.enable_record,
                 args.server_token,
-                args.server_host,
-                args.disable_ssl,
+                args.server_url,
+                args.record_interval,
             ))
             .then(|| {
                 db.set(SERVER_CONFIG, &server);
@@ -69,9 +71,9 @@ impl Config {
             db.set(APP_CONFIG, &app);
         });
 
-        let log_path = args
-            .log_path
-            .unwrap_or_else(|| match db.get::<String>(LOG_PATH) {
+        let log_dir = args
+            .log_dir
+            .unwrap_or_else(|| match db.get::<String>(LOG_DIR) {
                 Ok(Some(v)) => v,
                 _ => Config::current_dir().to_str().unwrap().to_string(),
             });
@@ -87,7 +89,7 @@ impl Config {
 
         let config = Config {
             db,
-            log_path: PathBuf::from(log_path),
+            log_dir: PathBuf::from(log_dir),
             web_server,
             server,
             app,
@@ -117,12 +119,8 @@ impl Config {
         self.app.token()
     }
 
-    pub fn server_token(&self) -> Option<String> {
-        self.server.token()
-    }
-
-    pub fn server_host(&self) -> Option<String> {
-        self.server.host()
+    pub fn server_url(&self) -> Option<String> {
+        self.server.url()
     }
 
     pub fn last_login(&self) -> u64 {
@@ -130,7 +128,7 @@ impl Config {
     }
 
     fn init_logging(&self) {
-        let log_path = self.log_path();
+        let log_dir = self.log_dir();
         let log_file = self.log_file();
         info!("日志文件路径: {:?}", log_file);
 
@@ -141,19 +139,10 @@ impl Config {
             )))
             .build();
 
-        // Logging to log file.
-        // let logfile = FileAppender::builder()
-        //     // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
-        //     .encoder(Box::new(PatternEncoder::new(
-        //         "[{d(%Y-%m-%d %H:%M:%S)} {T} {h({l})}] {m}{n}",
-        //     )))
-        //     .build(log_path)
-        //     .unwrap();
-
         // rolling log file.
         let window_roller = FixedWindowRoller::builder()
             .build(
-                &format!("{}/archive/serverbee.{}.log.gz", log_path.display(), "{}"),
+                &format!("{}/archive/serverbee.{}.log.gz", log_dir.display(), "{}"),
                 5,
             )
             .unwrap();
@@ -174,30 +163,11 @@ impl Config {
                 Root::builder()
                     .appender("stdout")
                     .appender("logfile")
-                    .build(LevelFilter::Info),
+                    .build(LevelFilter::Warn),
             )
             .unwrap();
 
         log4rs::init_config(log_config).unwrap();
-    }
-
-    fn get_config_yml() -> Result<WebServerConfig> {
-        let mut config_path = PathBuf::from("config.yml");
-        if let Ok(current_exe) = env::current_exe() {
-            if let Some(parent) = current_exe.parent() {
-                config_path = parent.join("config.yml");
-            }
-        }
-
-        let config_file = File::open(config_path)?;
-        Ok(serde_yaml::from_reader::<File, WebServerConfig>(
-            config_file,
-        )?)
-    }
-
-    pub fn get_server_port() -> u16 {
-        let d = Config::get_config_yml().unwrap_or_default();
-        d.port()
     }
 
     fn current_dir() -> PathBuf {
@@ -209,12 +179,12 @@ impl Config {
         env::current_dir().expect("获取当前目录失败, 权限不足或当前目录不存在")
     }
 
-    pub fn log_path(&self) -> PathBuf {
-        self.log_path.clone()
+    pub fn log_dir(&self) -> PathBuf {
+        self.log_dir.clone()
     }
 
     pub fn log_file(&self) -> PathBuf {
-        self.log_path().join("web.log")
+        self.log_dir().join("web.log")
     }
 
     pub fn set_web_server_config(&mut self, config: WebServerConfig) -> Result<()> {
@@ -236,18 +206,6 @@ impl Config {
         self.app.merge(config).then(|| {
             self.db.set::<AppConfig>(APP_CONFIG, &self.app);
         });
-        Ok(())
-    }
-
-    pub fn set_server_token(&mut self, token: &str) -> Result<()> {
-        self.server.set_token(Some(token.to_string()));
-        self.db.set::<ServerConfig>(SERVER_CONFIG, &self.server);
-        Ok(())
-    }
-
-    pub fn set_server_host(&mut self, host: &str) -> Result<()> {
-        self.server.set_host(Some(host.to_string()));
-        self.db.set::<ServerConfig>(SERVER_CONFIG, &self.server);
         Ok(())
     }
 

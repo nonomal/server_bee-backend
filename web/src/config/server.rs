@@ -2,18 +2,26 @@ use crate::traits::json_response::JsonResponder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
+    enable_record: bool,
     token: Option<String>,
-    host: Option<String>,
-    disable_ssl: bool,
+    url: Option<String>,
+    record_interval: Option<u64>,
 }
 
 impl ServerConfig {
-    pub fn new(token: Option<String>, host: Option<String>, disable_ssl: bool) -> Self {
+    pub fn new(
+        enable_record: bool,
+        token: Option<String>,
+        url: Option<String>,
+        record_interval: Option<u64>,
+    ) -> Self {
         ServerConfig {
+            enable_record,
             token,
-            host,
-            disable_ssl,
+            url,
+            record_interval,
         }
     }
 
@@ -21,43 +29,42 @@ impl ServerConfig {
     /// Returns true if any of the fields were changed.
     pub fn merge(&mut self, other: ServerConfig) -> bool {
         let mut merged = false;
+
+        if other.enable_record != self.enable_record {
+            self.enable_record = other.enable_record;
+            merged = true;
+        }
+
+        if other.record_interval.is_some() && other.record_interval != self.record_interval {
+            self.record_interval = other.record_interval;
+            merged = true;
+        }
+
         if other.token.is_some() && other.token != self.token {
             self.token = other.token.clone();
             merged = true;
         }
-        if other.host.is_some() && other.host != self.host {
-            self.host = other.host.clone();
-            merged = true;
-        }
-        if other.disable_ssl != self.disable_ssl {
-            self.disable_ssl = other.disable_ssl;
+        if other.url.is_some() && other.url != self.url {
+            self.url = other.url.clone();
             merged = true;
         }
         merged
+    }
+
+    pub fn enable_record(&self) -> bool {
+        self.enable_record
     }
 
     pub fn token(&self) -> Option<String> {
         self.token.clone()
     }
 
-    pub fn host(&self) -> Option<String> {
-        self.host.clone()
+    pub fn url(&self) -> Option<String> {
+        self.url.clone()
     }
 
-    pub fn disable_ssl(&self) -> bool {
-        self.disable_ssl
-    }
-
-    pub fn set_token(&mut self, token: Option<String>) {
-        self.token = token;
-    }
-
-    pub fn set_host(&mut self, host: Option<String>) {
-        self.host = host;
-    }
-
-    pub fn set_disable_ssl(&mut self, disable_ssl: bool) {
-        self.disable_ssl = disable_ssl;
+    pub fn record_interval(&self) -> Option<u64> {
+        self.record_interval
     }
 }
 
